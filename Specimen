@@ -1,0 +1,419 @@
+
+/*
+ * Copyright (c) 2021 OpenFTC Team
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+package org.firstinspires.ftc.teamcode._Autos;
+
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
+import com.arcrobotics.ftclib.controller.PIDController;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.hardware.CRServo;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.util.ElapsedTime;
+
+import org.openftc.easyopencv.OpenCvWebcam;
+
+/*
+ * This sample demonstrates how to run analysis during INIT
+ * and then snapshot that value for later use when the START
+ * command is issued. The pipeline is re-used from SkystoneDeterminationExample
+ */
+
+@Autonomous
+public class Specimen extends LinearOpMode
+{
+
+    private DcMotor FLW;
+    private DcMotor BLW;
+    private DcMotor FRW;
+    private DcMotor BRW;
+    private DcMotor Arm1;
+    private DcMotor Arm2;
+    private DcMotor Pivot;
+    private CRServo left;
+    private CRServo right;
+    private Servo claw;
+
+
+    //Incase Slides act up change the variables below:
+    public static int MAX_EXT = 2500;
+    public static int MID_EXT = 1403;
+    public static int NO_EXT = -200;
+
+
+    private PIDController Acontroller;
+    private PIDController Pcontroller;
+    //All the slide/Arm variables have an A at the beginning
+    public static double Ap = 0.02, Ai = 0, Ad = 0;
+    public static double Af = 0.05;
+    public static int Atarget = 0;
+
+    //All the Pivot variables have a P at the beginning
+    public static double Pp = .06, Pi = 0, Pd = 0;
+    public static double Pf = .005;
+    public static int Ptarget = 0;
+
+    public static int P_Down = -2200;
+    public static int P_Up = 900;
+    public static int Spec_Down = -2100;
+    public static int P_Score = -700;
+
+    private final double ticks_in_deg = 700 / 180;
+    private final double Pticks_in_deg = 700 / 180;
+    //Motors
+
+
+    //  private DcMotor slide;
+
+
+    static final double FEET_PER_METER = 3.28084;
+
+    // Lens intrinsics
+    // UNITS ARE PIXELS
+    // PIXELS AS IN THE HIT MOVIE WITH ADAM SANDLER
+    // NOTE: this calibration is for the C920 webcam at 800x448.
+    // You will need to do your own calibration for other configurations!
+    double fx = 578.272;
+    double fy = 578.272;
+    double cx = 402.145;
+    double cy = 221.506;
+
+
+
+    private ElapsedTime runtime = new ElapsedTime();
+
+    static final double COUNTS_PER_MOTOR_REV = 383.6;
+    static final double DRIVE_GEAR_REDUCTION = 1.0;
+    static final double WHEEL_DIAMETER_INCHES = 3.937;
+    static final double COUNTS_PER_INCH = (COUNTS_PER_MOTOR_REV * DRIVE_GEAR_REDUCTION) / (WHEEL_DIAMETER_INCHES * 3.1415);
+
+    // UNITS ARE METERS
+    static final double SPEED = .5;
+    OpenCvWebcam webcam;
+
+    @Override
+    public void runOpMode()
+    {
+
+        BRW = hardwareMap.dcMotor.get("BRW");
+        BLW = hardwareMap.dcMotor.get("BLW");
+        FRW = hardwareMap.dcMotor.get("FRW");
+        FLW = hardwareMap.dcMotor.get("FLW");
+        Arm1 = hardwareMap.dcMotor.get("Arm1");
+        Arm2 = hardwareMap.dcMotor.get("Arm2");
+        Pivot = hardwareMap.dcMotor.get("Pivot");
+        left = hardwareMap.crservo.get("left");
+        right = hardwareMap.crservo.get("right");
+        claw = hardwareMap.servo.get("right");
+        //   slide = hardwareMap.dcMotor.get("slide");
+
+
+        Acontroller = new PIDController(Ap,Ai,Ad);
+        Pcontroller = new PIDController(Pp,Pi,Pd);
+        telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
+
+        Acontroller.setPID(Ap,Ai,Ad);
+        int armPos = Arm1.getCurrentPosition();
+        double pid = Acontroller.calculate(armPos, Atarget);
+        double ff = Math.cos(Math.toRadians(Atarget/ ticks_in_deg)) * Af;
+        double power = pid + ff;
+        Arm1.setPower(power);
+        Arm2.setPower(-power);
+
+        Pcontroller.setPID(Pp,Pi,Pd);
+        int PivPos = Arm1.getCurrentPosition();
+        double Ppid = Pcontroller.calculate(PivPos, Ptarget);
+        double Pff = Math.cos(Math.toRadians(Ptarget/ Pticks_in_deg)) * Pf;
+        double Ppower = Ppid + Pff;
+        Pivot.setPower(Ppower);
+
+
+        FLW.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        BLW.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        FRW.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        BRW.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        Pivot.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        Arm2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        Arm1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+
+
+        FLW.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        BLW.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        FRW.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        BRW.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+
+        FLW.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        BLW.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        FRW.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        BRW.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+
+
+
+
+
+
+
+        Atarget = NO_EXT;
+        Ptarget = Spec_Down;
+        //Init Codes
+        waitForStart();
+        sleep(500);
+        claw.setPosition(0);
+        sleep(500);
+        driveForward(.1,3,10);
+
+       encoderStrafe(.3,35,10);
+        sleep(500);
+        driveForward(.5,16,10);
+        sleep(500);
+        //pivot and score
+        //PivPos = P_Score;
+        //Put Arm Code Here
+        Pivot.setPower(0.2);
+        sleep(500);
+
+        sleep(10000);
+
+       // PivPos = P_Down;
+
+        sleep(100);
+        Arm1.setPower(-.7);
+        Arm2.setPower(.7);
+        sleep(1100);
+
+        driveForward(.3,-10, 10);
+        sleep(500);
+        encoderStrafe(.5,-51,10);
+        sleep(500);
+        turnRight(0.1);
+        sleep(250);
+        driveForward(.4,-5,20);
+        sleep(250);
+        encoderStrafe(.5,-4,10);
+        sleep(500);
+
+
+
+
+
+
+
+    }
+
+
+
+
+    public void driveForward(double speed, double dist, double timeout) {
+        encoderDrive(speed, dist, dist, timeout);
+    }
+
+    public void turnLeft(double angle){
+        encoderDrive(.4, -angle, angle, 10);
+    }
+    public void turnRight(double angle){
+        encoderDrive(.4, angle, -angle, 10);
+    }
+
+    public void turn(double timeout, double angleL, double angleR) {
+        encoderDrive(.4, angleL, angleR, timeout);
+    }
+    public void encoderPivot(int Pitarget){
+        Pcontroller.setPID(Pp,Pi,Pd);
+        int PivPos = Pivot.getCurrentPosition();
+        double Ppid = Pcontroller.calculate(PivPos, Ptarget);
+        double Pff = Math.cos(Math.toRadians(Ptarget/ Pticks_in_deg)) * Pf;
+        double Ppower = Ppid + Pff;
+        //Finishes the math by setting the power to the pid + ff
+        Pivot.setPower(Ppower);
+        telemetry.addData("power", Ppower);
+        telemetry.addData("pos", PivPos);
+        telemetry.addData("target", Ptarget);
+        telemetry.update();
+        Ptarget = Pitarget;
+    }
+    public void encoderArm(int Aitarget){
+
+        Acontroller.setPID(Ap,Ai,Ad);
+        int armPos = Arm1.getCurrentPosition();
+        double Apid = Acontroller.calculate(armPos, Aitarget);
+        double Aff = Math.cos(Math.toRadians(Aitarget/ ticks_in_deg)) * Af;
+        double Apower = Apid + Aff;
+        Arm1.setPower(Apower);
+        Arm2.setPower(-Apower);
+        telemetry.addData("pos", armPos);
+        telemetry.addData("target", Aitarget);
+        telemetry.update();
+
+    }
+    public void encoderDrive(double speed, double distL, double distR, double timeoutS) {
+        int newLeftTarget;
+        int newRightTarget;
+
+
+        if (opModeIsActive()) {
+
+
+            newLeftTarget = FLW.getCurrentPosition() + (int) (distL * COUNTS_PER_INCH);
+            newRightTarget = FRW.getCurrentPosition() + (int) (distR * COUNTS_PER_INCH);
+            FLW.setTargetPosition(-newLeftTarget);
+            BLW.setTargetPosition(-newLeftTarget);
+            FRW.setTargetPosition(newRightTarget);
+            BRW.setTargetPosition(newRightTarget);
+
+
+            FLW.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            BLW.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            FRW.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            BRW.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+
+            runtime.reset();
+            FLW.setPower(Math.abs(speed));
+            BLW.setPower(Math.abs(speed));
+            FRW.setPower(Math.abs(speed));
+            BRW.setPower(Math.abs(speed));
+
+
+            while (opModeIsActive() &&
+                    (runtime.seconds() < timeoutS) &&
+                    (FLW.isBusy() && FRW.isBusy()) &&
+                    (FLW.isBusy() && FRW.isBusy())) {
+
+
+                telemetry.addData("Path1", "Running to %7d :%7d", newLeftTarget, newRightTarget);
+                telemetry.addData("Path2", "Running at %7d :%7d",
+                        FLW.getCurrentPosition(),
+                        BLW.getCurrentPosition(),
+                        FRW.getCurrentPosition(),
+                        BRW.getCurrentPosition());
+                telemetry.update();
+            }
+
+
+            FLW.setPower(0);
+            BLW.setPower(0);
+            FRW.setPower(0);
+            BRW.setPower(0);
+
+
+            FLW.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            BLW.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            FRW.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            BRW.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+
+
+            FLW.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            BLW.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            FRW.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            BRW.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        }
+    }
+
+    public void encoderStrafe(double speed, double dist, double timeoutS) {
+        int newLeftTarget;
+        int newRightTarget;
+
+
+        if (opModeIsActive()) {
+
+
+            newLeftTarget = FLW.getCurrentPosition() + (int) (dist * COUNTS_PER_INCH);
+            newRightTarget = FRW.getCurrentPosition() + (int) (dist * COUNTS_PER_INCH);
+            FLW.setTargetPosition(-newLeftTarget);
+            BLW.setTargetPosition(newLeftTarget);
+            FRW.setTargetPosition(-newRightTarget);
+            BRW.setTargetPosition(newRightTarget);
+
+
+            FLW.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            BLW.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            FRW.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            BRW.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+
+            runtime.reset();
+            FLW.setPower(Math.abs(speed));
+            BLW.setPower(Math.abs(speed));
+            FRW.setPower(Math.abs(speed));
+            BRW.setPower(Math.abs(speed));
+
+
+            while (opModeIsActive() &&
+                    (runtime.seconds() < timeoutS) &&
+                    (FLW.isBusy() && FRW.isBusy()) &&
+                    (FLW.isBusy() && FRW.isBusy())) {
+
+                // Display it for the driver.
+                telemetry.addData("Path1", "Running to %7d :%7d", newLeftTarget, newRightTarget);
+                telemetry.addData("Path2", "Running at %7d :%7d",
+                        FLW.getCurrentPosition(),
+                        BLW.getCurrentPosition(),
+                        FRW.getCurrentPosition(),
+                        BRW.getCurrentPosition());
+                telemetry.update();
+            }
+
+
+            FLW.setPower(0);
+            BLW.setPower(0);
+            FRW.setPower(0);
+            BRW.setPower(0);
+
+            FLW.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            BLW.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            FRW.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            BRW.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+
+            FLW.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            BLW.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            FRW.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            BRW.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        }
+    } public void rise(double speed, long timer){
+    Arm1.setPower(speed);
+    Arm2.setPower(-speed);
+    sleep(timer);
+    Arm1.setPower(0);
+    Arm2.setPower(0);
+} public void raisepivot(double speed, long timer){
+    Pivot.setPower(speed);
+    sleep(timer);
+    Pivot.setPower(0);
+} public void outtake(){
+    left.setPower(1);
+    right.setPower(-1);
+} public void stopintake(){
+    left.setPower(0);
+    right.setPower(0);
+} public void intake(){
+    left.setPower(-1);
+    right.setPower(1);
+}
+
+}
