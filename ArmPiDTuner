@@ -1,0 +1,74 @@
+package org.firstinspires.ftc.teamcode._TeleOPs;
+
+
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.acmerobotics.dashboard.config.Config;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.arcrobotics.ftclib.controller.PIDController;
+
+@Config
+@TeleOp
+public class
+ArmPiDTuner extends LinearOpMode {
+
+
+    private PIDController controller;
+    public static double p = 0, i = 0, d = 0;
+    //sets the p, i, d, to zero for usage
+    public static double f = 0;
+    //sets the sets the f value to 0 for usage
+    public static int target = 0;
+    //sets the target to zero for usage
+    private final double ticks_in_deg = 700 / 180;
+    //sets the math for the ticks in degrees
+    private DcMotorEx Arm1;
+    private DcMotorEx Arm2;
+    //Sets the Arm as Arm1
+
+
+    public void runOpMode() throws InterruptedException {
+
+
+
+        controller = new PIDController(p,i,d);
+        telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
+        Arm1 = hardwareMap.get(DcMotorEx.class, "PivotBot");
+        Arm2 = hardwareMap.get(DcMotorEx.class, "PivotTop");
+        //sets the controller, telemetry, and Arm to a function on the driver hub
+        Arm1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        Arm2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+        waitForStart();
+        while (opModeIsActive()) {
+
+
+            //PID Stuff
+            controller.setPID(p,i,d);
+            //Sets the PID to the preset value
+            int armPos = Arm1.getCurrentPosition();
+            //Gets the position of the arm from the motors
+            double pid = controller.calculate(armPos, target);
+            //sets the pid to the armPos to the target
+            double ff = Math.cos(Math.toRadians(target/ ticks_in_deg)) * f;
+            //use math (Sets math to Radians and divides the target by the degrees and multiplies by f) to set the ff
+
+            double power = pid + ff;
+            //Finishes the math by setting the power to the pid + ff
+
+            Arm1.setPower(power);
+            Arm2.setPower(power);
+            //Uses the recently set power variable to find the power needed to make the correct movements
+
+            telemetry.addData("pos", armPos);
+            telemetry.addData("target", target);
+            telemetry.update();
+            //Adds the data captured to be displayed on the diver hub
+
+        }
+
+    }
+}
