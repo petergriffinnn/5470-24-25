@@ -1,0 +1,899 @@
+package org.firstinspires.ftc.teamcode._Autos;
+
+// RR-specific imports
+import androidx.annotation.NonNull;
+
+// RR-specific imports
+import com.acmerobotics.dashboard.config.Config;
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
+import com.acmerobotics.roadrunner.Action;
+import com.acmerobotics.roadrunner.Pose2d;
+import com.acmerobotics.roadrunner.SequentialAction;
+import com.acmerobotics.roadrunner.Vector2d;
+import com.acmerobotics.roadrunner.ftc.Actions;
+import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
+
+
+// Non-RR imports
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.arcrobotics.ftclib.controller.PIDController;
+
+import org.firstinspires.ftc.teamcode.MecanumDrive;
+import org.openftc.easyopencv.OpenCvWebcam;
+//import org.firstinspires.ftc.vision.opencv.ImageRegion;
+
+
+@Config
+@Autonomous(name = "FourLeftBasketFR", group = "Autonomous")
+public class FourLeftBasketFR extends LinearOpMode {
+    public class Arm {
+        private DcMotorEx Arm1;
+        private DcMotorEx Arm2;
+
+        public Arm(HardwareMap hardwareMap) {
+            Arm1 = hardwareMap.get(DcMotorEx.class, "Arm1");
+            Arm2 = hardwareMap.get(DcMotorEx.class, "Arm2");
+            Arm1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            Arm2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            Arm1.setDirection(DcMotorSimple.Direction.FORWARD);
+            Arm2.setDirection(DcMotorSimple.Direction.FORWARD);
+
+        }
+
+        public class ArmUp implements Action {
+            private boolean initialized = false;
+
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                if (!initialized) {
+                    Arm1.setPower(1);
+                    Arm2.setPower(1);
+                    initialized = true;
+                }
+
+                double pos = Arm1.getCurrentPosition()*-1;
+                packet.put("liftPos", pos);
+                if (pos < 2400) {
+                    return true;
+                } else {
+                    Arm1.setPower(0);
+                    Arm2.setPower(0);
+                    return false;
+                }
+            }
+        }
+
+        public Action lift() {
+            return new ArmUp();
+        }
+        public class ArmDown implements Action {
+            private boolean initialized = false;
+
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                if (!initialized) {
+                    Arm1.setPower(-1);
+                    Arm2.setPower(-1);
+                    initialized = true;
+                }
+
+                double pos = Arm1.getCurrentPosition()*-1;
+                packet.put("liftPos", pos);
+                if (pos > 200) {
+                    return true;
+                } else {
+                    Arm1.setPower(0);
+                    Arm2.setPower(0);
+                    return false;
+                }
+            }
+        }
+
+        public Action drop() {
+            return new ArmDown();
+        }
+        public class ArmMid implements Action {
+            private boolean initialized = false;
+
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                if (!initialized) {
+                    Arm1.setPower(1);
+                    Arm2.setPower(1);
+                    initialized = true;
+                }
+
+                double pos = Arm1.getCurrentPosition()*-1;
+                packet.put("liftPos", pos);
+                if (pos < 1100) {
+                    return true;
+                } else if(pos > 1350) {
+                    Arm1.setPower(-1);
+                    Arm2.setPower(-1);
+                    return true;
+                } else {
+                    Arm1.setPower(0);
+                    Arm2.setPower(0);
+
+                    return false;
+                }
+            }
+        }
+
+        public Action mid() {
+            return new ArmMid();
+        }
+        public class ArmScore implements Action {
+            private boolean initialized = false;
+
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                if (!initialized) {
+                    Arm1.setPower(-1);
+                    Arm2.setPower(1);
+                    initialized = true;
+                }
+
+                double pos = Arm1.getCurrentPosition();
+                packet.put("liftPos", pos);
+                if (pos > 1400) {
+                    return true;
+                } else {
+                    Arm1.setPower(0);
+                    Arm2.setPower(0);
+                    return false;
+                }
+            }
+        }
+
+        public Action score() {
+            return new ArmScore();
+        }
+    }
+    public class Pivot {
+        private DcMotorEx PivotTop;
+        private DcMotorEx PivotBot;
+
+        public Pivot(HardwareMap hardwareMap) {
+            PivotBot = hardwareMap.get(DcMotorEx.class, "PivotBot");
+            PivotTop = hardwareMap.get(DcMotorEx.class, "PivotTop");
+            PivotBot.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            PivotTop.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            PivotTop.setDirection(DcMotorSimple.Direction.FORWARD);
+            PivotBot.setDirection(DcMotorSimple.Direction.FORWARD);
+        }
+
+        public class UpFr implements Action {
+            private boolean initialized = false;
+
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                if (!initialized) {
+                    PivotTop.setPower(0.8);
+                    PivotBot.setPower(0.8);
+                    initialized = true;
+                }
+
+                double pos = PivotTop.getCurrentPosition();
+                packet.put("liftPos", pos);
+                if (pos < 3170) {
+                    return true;
+                } else {
+                    PivotTop.setPower(0);
+                    PivotBot.setPower(0);
+                    return false;
+                }
+            }
+        }
+
+        public Action Up() {
+            return new UpFr();
+        }
+
+        public class PivotDown implements Action {
+            private boolean initialized = false;
+
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                if (!initialized) {
+                    PivotTop.setPower(-0.8);
+                    PivotBot.setPower(-0.8);
+                    initialized = true;
+                }
+
+                double pos = PivotTop.getCurrentPosition();
+                packet.put("liftPos", pos);
+                if (pos > 130) {
+                    return true;
+                } else {
+                    PivotTop.setPower(0);
+                    PivotBot.setPower(0);
+                    return false;
+                }
+            }
+        }
+
+        public Action pivotfall() {
+            return new PivotDown();
+        }
+
+        public class PivotMid implements Action {
+            private boolean initialized = false;
+
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                if (!initialized) {
+                    Ptarget = P_Mid;
+                    initialized = true;
+                }
+
+                Pcontroller.setPID(Pp, Pi, Pd);
+                int pivPos = PivotTop.getCurrentPosition();
+                double Ppid = Pcontroller.calculate(pivPos, Ptarget);
+                double Pff = Math.cos(Math.toRadians(Ptarget / ticks_in_deg)) * Pf;
+                double power = Ppid + Pff;
+                //Finishes the math by setting the power to the pid + ff
+                PivotTop.setPower(power * .8);
+                PivotBot.setPower(power * .8);
+                telemetry.addData("pos", pivPos);
+                telemetry.addData("target", Ptarget);
+                telemetry.update();
+                if (Ptarget == pivPos){
+                    return false;
+                } else {
+                    return true;
+                }
+            }
+        }
+
+
+
+
+
+        public Action pivotmid() {
+            return new PivotMid();
+        } public class PivotUpBattery implements Action {
+
+
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                PivotTop.setPower(0.8);
+                PivotBot.setPower(0.8);
+
+
+                return false;
+            }
+
+
+        } public Action pivotupbattery() {
+            return new PivotUpBattery();
+        }
+        public class PivotBatteryStop implements Action {
+
+
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                PivotTop.setPower(0);
+                PivotBot.setPower(0);
+
+
+                return false;
+
+            }
+        } public Action pivotstop() {
+            return new PivotBatteryStop();
+        }
+        public class PivotDownBattery implements Action {
+
+
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                PivotTop.setPower(-0.8);
+                PivotBot.setPower(-0.8);
+
+
+                return false;
+            }
+
+
+        } public Action pivotdownbattery() {
+            return new PivotDownBattery();
+        }
+
+
+
+        public class PivotScore implements Action {
+            private boolean initialized = false;
+
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                if (!initialized) {
+                    PivotTop.setPower(0.8);
+                    PivotBot.setPower(0.8);
+                    initialized = true;
+                }
+
+                double Ppos = PivotTop.getCurrentPosition();
+                packet.put("liftPos", Ppos);
+                if (Ppos < P_Up) {
+                    PivotTop.setPower(0.8);
+                    PivotBot.setPower(0.8);
+                    return true;
+                } else {
+                    PivotTop.setPower(0);
+                    PivotBot.setPower(0);
+                    return false;
+                }
+            }
+        }
+
+        public Action pivotscore() {
+            return new PivotScore();
+        }
+    }
+
+    public class Actuator {
+        private Servo Actuator;
+
+        public Actuator(HardwareMap hardwareMap) {
+            Actuator = hardwareMap.get(Servo.class, "Actuator");
+        }
+
+        public class ActuatorExtend implements Action {
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                Actuator.setPosition(1);
+                return false;
+            }
+        }
+        public Action ActuatorExtend() {
+            return new ActuatorExtend();
+        }
+
+
+        public class ActuatorRetract implements Action {
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                Actuator.setPosition(0);
+                return false;
+            }
+        }
+        public Action ActuatorRetract() {
+            return new ActuatorRetract();
+        }
+    }
+    public class Claw {
+        private Servo Claw;
+
+        public Claw(HardwareMap hardwareMap) {
+            Claw = hardwareMap.get(Servo.class, "claw");
+        }
+
+        public class ClawOpen implements Action {
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                Claw.setPosition(1);
+                return false;
+            }
+        }
+        public Action ClawOpen() {
+            return new ClawOpen();
+        }
+
+
+        public class ClawClose implements Action {
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                Claw.setPosition(0);
+                return false;
+            }
+        }
+        public Action ClawClose() {
+            return new ClawClose();
+        }
+    }
+
+
+    public class Twist {
+        private Servo twist;
+
+        public Twist(HardwareMap hardwareMap) {
+            twist = hardwareMap.get(Servo.class, "twist");
+        }
+
+        public class twistup implements Action {
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                twist.setPosition(0.5755);
+                return false;
+            }
+        }
+        public Action twist1() {
+            return new twistup();
+        }
+
+        public class twistdown implements Action {
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                twist.setPosition(1.0);
+                return false;
+            }
+        }
+        public Action twist2() {
+            return new twistdown();
+        }
+    }
+    public class Pitch {
+        private Servo pitch;
+
+        public Pitch(HardwareMap hardwareMap) {
+            pitch = hardwareMap.get(Servo.class, "pitch");
+            pitch.setDirection(Servo.Direction.REVERSE);
+        }
+
+        public class PitchDown implements Action {
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                pitch.setPosition(0.01);
+                return false;
+            }
+
+        }
+        public Action pitchdown() {
+            return new PitchDown();
+        }
+
+        public class PitchMid implements Action {
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                pitch.setPosition(0.3);
+                return false;
+            }
+        }
+        public Action pitchmid() {
+            return new PitchMid();
+        }
+        public class PitchUp implements Action {
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+                pitch.setPosition(0.7);
+                return false;
+            }
+        }
+        public Action pitchup() {
+            return new PitchUp();
+        }
+
+
+    }
+
+
+
+
+
+
+
+
+    public static int MAX_EXT = 2500;
+    public static int MID_EXT = 915;
+    public static int NO_EXT = 23;
+
+
+    private PIDController controller;
+    //All the slide/Arm variables have an A at the beginning
+    public static double Ap = 0.039, Ai = 0, Ad = 0.00017;
+    public static double Af = 0.05;
+    public static int Atarget = 0;
+
+    //All the Pivot variables have a P at the beginning
+    public static double Pp = 0.03, Pi = 0, Pd = .00063;
+    private PIDController Pcontroller;
+    public static double Pf = 0.009;
+    public static int Ptarget = 300;
+
+    public static int P_Down = 300;
+    public static int P_Mid = 1000;
+
+    public static int P_Up = 2700;
+
+
+    private final double ticks_in_deg = 700 / 180;
+    //Motors
+
+    private DcMotor Arm1;
+    private DcMotor Arm2;
+    private DcMotor PivotBot;
+    private DcMotor PivotTop;
+    private boolean APidOn;
+    private boolean PPidOn;
+    private Servo claw;
+    private Servo pitch;
+    private Servo twist;
+    private Servo Actuator;
+
+    static final double FEET_PER_METER = 3.28084;
+
+    // Lens intrinsics
+    // UNITS ARE PIXELS
+    // PIXELS AS IN THE HIT MOVIE WITH ADAM SANDLER
+    // NOTE: this calibration is for the C920 webcam at 800x448.
+    // You will need to do your own calibration for other configurations!
+    double fx = 578.272;
+    double fy = 578.272;
+    double cx = 402.145;
+    double cy = 221.506;
+
+
+
+    private ElapsedTime runtime = new ElapsedTime();
+
+    static final double COUNTS_PER_MOTOR_REV = 383.6;
+    static final double DRIVE_GEAR_REDUCTION = 1.0;
+    static final double WHEEL_DIAMETER_INCHES = 3.937;
+    static final double COUNTS_PER_INCH = (COUNTS_PER_MOTOR_REV * DRIVE_GEAR_REDUCTION) / (WHEEL_DIAMETER_INCHES * 3.1415);
+
+    // UNITS ARE METERS
+    static final double SPEED = .5;
+    OpenCvWebcam webcam;
+
+    @Override
+
+
+
+
+
+
+    public void runOpMode() {
+
+
+        Twist twist = new Twist(hardwareMap);
+        Pitch pitch = new Pitch(hardwareMap);
+        Claw claw = new Claw(hardwareMap);
+        Pivot pivot = new Pivot(hardwareMap);
+        Arm arm = new Arm(hardwareMap);
+        Actuator actuator = new Actuator(hardwareMap);
+
+        APidOn = true;
+        PPidOn = true;
+        controller = new PIDController(Ap, Ai, Ad);
+        Pcontroller = new PIDController(Pp, Pi, Pd);
+        telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
+
+        Pose2d initialPose = new Pose2d(30, 60, Math.toRadians(270));
+        MecanumDrive drive = new MecanumDrive(hardwareMap, initialPose);
+
+        DcMotor Arm1 = hardwareMap.dcMotor.get("Arm1");
+        DcMotor Arm2 = hardwareMap.dcMotor.get("Arm2");
+        DcMotor PivotTop = hardwareMap.dcMotor.get("PivotTop");
+        DcMotor PivotBot = hardwareMap.dcMotor.get("PivotBot");
+
+
+        //Servo claw = hardwareMap.servo.get("claw");
+        // Servo pitch = hardwareMap.servo.get("pitch");
+        //Servo twist = hardwareMap.servo.get("twist");
+
+
+        TrajectoryActionBuilder tab1 = drive.actionBuilder(initialPose)
+                .strafeToLinearHeading(new Vector2d(30,50), Math.toRadians(270));
+
+        TrajectoryActionBuilder tab2 = tab1.endTrajectory().fresh()
+                .setTangent(0)
+                .strafeToLinearHeading(new Vector2d(52,53), Math.toRadians(225));
+
+//        TrajectoryActionBuilder tab360 = tab2.endTrajectory().fresh()
+//                .setTangent(0)
+//                .waitSeconds(2);
+
+
+
+        TrajectoryActionBuilder tab361 = tab2.endTrajectory().fresh()
+                .setTangent(0)
+                .waitSeconds(1.2);
+
+        TrajectoryActionBuilder Diddy = tab361.endTrajectory().fresh()
+                .setTangent(0)
+                .waitSeconds(1.5);
+
+        TrajectoryActionBuilder oxford = tab361.endTrajectory().fresh()
+                .setTangent(0)
+                .waitSeconds(.8);
+
+        TrajectoryActionBuilder tab4 = oxford.endTrajectory().fresh()
+                .setTangent(0)
+                .strafeToLinearHeading(new Vector2d(49,46), Math.toRadians(277));
+
+        TrajectoryActionBuilder ts = tab4.endTrajectory().fresh()
+                .setTangent(0)
+                .waitSeconds(1.2);
+
+        TrajectoryActionBuilder tab6 = ts.endTrajectory().fresh()
+                .setTangent(0)
+                .strafeToLinearHeading(new Vector2d(51,52), Math.toRadians(225));
+
+        TrajectoryActionBuilder pmo = tab6.endTrajectory().fresh()
+                .setTangent(0)
+                .waitSeconds(1);
+
+
+
+        TrajectoryActionBuilder tab12 = pmo.endTrajectory().fresh()
+                .setTangent(0)
+                .strafeToLinearHeading(new Vector2d(60,45), Math.toRadians(280));
+
+        TrajectoryActionBuilder icl = tab12.endTrajectory().fresh()
+                .setTangent(0)
+                .waitSeconds(1.1);
+
+        TrajectoryActionBuilder huzz = icl.endTrajectory().fresh()
+                .setTangent(0)
+                .strafeToLinearHeading(new Vector2d(49,52), Math.toRadians(225));
+
+        TrajectoryActionBuilder bruzz = huzz.endTrajectory().fresh()
+                .setTangent(0)
+                .waitSeconds(1.1);
+
+        TrajectoryActionBuilder freakybob = bruzz.endTrajectory().fresh()
+                .setTangent(0)
+                .waitSeconds(1.1);
+
+//        TrajectoryActionBuilder ninja = bruzz.endTrajectory().fresh()
+//                .setTangent(0)
+//                .strafeToLinearHeading(new Vector2d(55,24), Math.toRadians(280));
+
+        //Grab second
+        TrajectoryActionBuilder tab7 = tab12.endTrajectory().fresh()
+                .setTangent(0)
+                .strafeToLinearHeading(new Vector2d(62,32), Math.toRadians(275));
+
+
+
+
+
+        TrajectoryActionBuilder tab9 = bruzz.endTrajectory().fresh()
+                .setTangent(0)
+                .strafeToLinearHeading(new Vector2d(64,48), Math.toRadians(275));
+
+        TrajectoryActionBuilder tab8 = tab9.endTrajectory().fresh()
+                .setTangent(0)
+                .strafeToLinearHeading(new Vector2d(51,53), Math.toRadians(225));
+
+        TrajectoryActionBuilder tab364 = tab8.endTrajectory().fresh()
+                .setTangent(0)
+                .waitSeconds(2);
+
+
+
+
+        TrajectoryActionBuilder tab10 = tab8.endTrajectory().fresh()
+                .setTangent(0)
+                .strafeToLinearHeading(new Vector2d(66,32), Math.toRadians(275));
+
+        TrajectoryActionBuilder tab14 = tab10.endTrajectory().fresh()
+                .setTangent(0)
+                .strafeToLinearHeading(new Vector2d(60,32), Math.toRadians(275));
+
+        TrajectoryActionBuilder tab15 = tab14.endTrajectory().fresh()
+                .setTangent(0)
+                .strafeToLinearHeading(new Vector2d(64,33), Math.toRadians(275));
+
+
+        //final score
+        TrajectoryActionBuilder tab11 = tab15.endTrajectory().fresh()
+                .setTangent(0)
+                .strafeToLinearHeading(new Vector2d(51,55), Math.toRadians(225));
+
+        TrajectoryActionBuilder tab13 = tab11.endTrajectory().fresh()
+                .setTangent(0)
+                .strafeToLinearHeading(new Vector2d(40,8), Math.toRadians(185));
+
+
+        TrajectoryActionBuilder tab100= tab13.endTrajectory().fresh()
+                .setTangent(0)
+                .strafeToLinearHeading(new Vector2d(30,8), Math.toRadians(185));
+
+        TrajectoryActionBuilder tab101= tab100.endTrajectory().fresh()
+                .setTangent(0)
+                .waitSeconds(1);
+
+
+
+
+
+
+        Action trajectoryActionCloseOut = tab4.endTrajectory().fresh()
+                .build();
+
+
+
+
+
+       // Actions.runBlocking(claw.ClawOpen());
+        Actions.runBlocking(claw.ClawClose());
+        Actions.runBlocking(pivot.pivotfall());
+        Actions.runBlocking(arm.drop());
+        Actions.runBlocking(pitch.pitchup());
+        Actions.runBlocking(twist.twist1());
+        Actions.runBlocking(actuator.ActuatorExtend());
+        Actions.runBlocking(actuator.ActuatorRetract());
+
+
+
+        waitForStart();
+
+
+
+        Action trajectoryActionChosen;
+        trajectoryActionChosen = tab1.build();
+
+        Action Fortnite;
+
+        Fortnite = tab2.build();
+
+
+
+        Action Centersample;
+        Centersample = tab4.build();
+
+
+
+
+        Action firstsamplepush;
+        firstsamplepush = tab6.build();
+
+        Action Jelq;
+        Jelq = tab7.build();
+
+        Action BackThatThangUp;
+        BackThatThangUp = tab8.build();
+
+        Action LineUp;
+        LineUp = tab9.build();
+
+        Action LineMid;
+        LineMid = tab12.build();
+
+        Action ThreePeat;
+        ThreePeat = tab10.build();
+
+        Action FinalScore;
+        FinalScore = tab11.build();
+
+        Action Ascent1;
+        Ascent1 = tab13.build();
+
+        Action Oxford;
+        Oxford = oxford.build();
+
+
+        Action Push;
+        Push = tab14.build();
+        Action MiniWait;
+        MiniWait = tab361.build();
+
+        Action BACKUPAGAIN;
+        BACKUPAGAIN = tab15.build();
+
+//        Action BF_wait_pivot_for_basket;
+//        BF_wait_pivot_for_basket = tab360.build();
+
+        Action Pmo;
+        Pmo = pmo.build();
+
+        Action OnRodsMama;
+        OnRodsMama = ts.build();
+
+        Action ifykyk;
+        ifykyk = icl.build();
+
+        Action chuzz;
+        chuzz = huzz.build();
+
+        Action choppedchin;
+        choppedchin = bruzz.build();
+
+        Action DiddyDown;
+        DiddyDown = Diddy.build();
+
+        Action waitAscent;
+        waitAscent = tab100.build();
+
+        Action Ascent2;
+        Ascent2 = tab101.build();
+
+
+        Action GF_wait_pivot_for_basket;
+        GF_wait_pivot_for_basket = tab364.build();
+
+        Action freakbob;
+        freakbob = freakybob.build();
+
+
+
+
+
+        Actions.runBlocking(
+                new SequentialAction(
+
+                        pitch.pitchmid(),
+                        trajectoryActionChosen,
+                        claw.ClawClose(),
+                        Fortnite,
+                        pivot.Up(),
+                        arm.lift(),
+                        pitch.pitchup(),
+                        claw.ClawOpen(),
+                        MiniWait,
+                        pitch.pitchdown(),
+                        arm.mid(),
+                        actuator.ActuatorExtend(),
+                        Centersample,
+                        pivot.pivotfall(),
+                        claw.ClawClose(),
+                        OnRodsMama,
+                        firstsamplepush,
+
+                        pivot.Up(),
+                        arm.lift(),
+                        pitch.pitchdown(),
+                        pitch.pitchup(),
+                        Pmo,
+                        claw.ClawOpen(),
+                        pitch.pitchdown(),
+                        arm.mid(),
+
+                       //Break
+
+                        LineMid,
+                        pivot.pivotfall(),
+                        claw.ClawClose(),
+                        ifykyk,
+                        chuzz,
+
+                        pivot.Up(),
+                        arm.lift(),
+                        pitch.pitchdown(),
+                        pitch.pitchup(),
+                        choppedchin,
+                        claw.ClawOpen(),
+                        freakbob,
+                        pitch.pitchdown(),
+                        arm.mid(),
+
+                  //      LineUp,
+//                        BackThatThangUp,
+//                        ThreePeat,
+//                        BACKUPAGAIN,
+//                        FinalScore,
+
+                        Ascent1,
+                        Ascent2,
+                        pivot.pivotdownbattery(),
+                        waitAscent,
+                        pivot.pivotstop(),
+
+                        trajectoryActionCloseOut
+
+
+                )
+
+        );
+
+
+
+    }
+
+
+
+
+
+}
